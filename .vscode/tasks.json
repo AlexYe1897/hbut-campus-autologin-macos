@@ -1,0 +1,23 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "校园网：构建 macOS 应用",
+      "type": "process",
+      "command": "/bin/zsh",
+      "args": ["${workspaceFolder}/build.sh"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "校园网：离线检查",
+      "type": "process",
+      "command": "/bin/zsh",
+      "args": ["${workspaceFolder}/test.sh"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": "test",
+      "problemMatcher": []
+    }
+  ]
+}

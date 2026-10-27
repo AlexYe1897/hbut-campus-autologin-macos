@@ -1,0 +1,29 @@
+name: macOS checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Check Swift package
+        run: swift build
+      - name: Run offline checks
+        run: zsh test.sh
+      - name: Build app bundle
+        run: zsh build.sh
+      - name: Verify bundle metadata and signature
+        run: |
+          plutil -lint "build/校园网自动登录.app/Contents/Info.plist"
+          codesign --verify --strict "build/校园网自动登录.app"

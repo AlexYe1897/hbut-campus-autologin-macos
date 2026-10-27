@@ -1,0 +1,26 @@
+# Generated apps, reports and compiler caches
+/build/
+/dist/
+/.build/
+/.swiftpm/
+*.app/
+*.dSYM/
+
+# macOS and personal editor state
+.DS_Store
+*.xcuserstate
+xcuserdata/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/tasks.json
+
+# Local secrets, settings and diagnostics
+.env
+.env.*
+*.log
+*.keychain
+*.keychain-db
+/config.json
+/status.json
+/listener.json
+HBUTAutoLogin/
