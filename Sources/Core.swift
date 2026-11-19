@@ -89,6 +89,9 @@ struct NetworkSnapshot: Equatable {
     var joined: String
     var identity: String { [interface, address, router, profile, joined].joined(separator: "|") }
     static func current() -> NetworkSnapshot? {
+        #if TUN_COMPAT
+        return TUNSupport.currentNetwork()
+        #else
         guard let store = SCDynamicStoreCreate(nil, "HBUT read network" as CFString, nil, nil),
               let global = SCDynamicStoreCopyValue(store, "State:/Network/Global/IPv4" as CFString) as? [String: Any],
               let interface = global["PrimaryInterface"] as? String,
@@ -105,6 +108,7 @@ struct NetworkSnapshot: Equatable {
                                router: global["Router"] as? String ?? "",
                                profile: wifi["ProfileID"] as? String ?? "",
                                joined: String(describing: wifi["AutoJoinTimestamp"] ?? ""))
+        #endif
     }
     func matches(_ configuration: Configuration) -> Bool {
         !configuration.networkProfile.isEmpty && profile == configuration.networkProfile
@@ -209,9 +213,16 @@ struct HTTPResponse {
 final class DirectHTTP {
     let cancellation: Cancellation
     let deadline: TimeInterval
+    #if TUN_COMPAT
+    let boundInterface: String?
+    var tunResolvedHosts: [String: [String]] = [:]
+    #endif
     init(_ cancellation: Cancellation, seconds: TimeInterval = 27) {
         self.cancellation = cancellation
         deadline = ProcessInfo.processInfo.systemUptime + seconds
+        #if TUN_COMPAT
+        boundInterface = TUNSupport.currentNetwork()?.interface
+        #endif
     }
     static func quote(_ value: String) -> String {
         "\"" + value.replacingOccurrences(of: "\\", with: "\\\\")
@@ -219,7 +230,7 @@ final class DirectHTTP {
             .replacingOccurrences(of: "\r", with: "\\r")
             .replacingOccurrences(of: "\n", with: "\\n") + "\""
     }
-    func request(_ url: URL, body: String? = nil, timeout: Double = 4, headOnly: Bool = false) throws -> HTTPResponse {
+    func request(_ url: URL, body: String? = nil, timeout: Double = 4, headOnly: Bool = false, resolvedAddress: String? = nil) throws -> HTTPResponse {
         if cancellation.cancelled { throw CancellationError() }
         let remaining = deadline - ProcessInfo.processInfo.systemUptime
         guard remaining > 0.2 else { throw CampusError.message("本轮连接检查已超时，等待下一次开盖或手动重连。") }
@@ -234,6 +245,17 @@ final class DirectHTTP {
         task.standardInput = input; task.standardOutput = output; task.standardError = FileHandle.nullDevice
         // URLs and POST bodies go through stdin, never the process argument list or disk.
         var configuration = "url = \(Self.quote(url.absoluteString))\nheader = \(Self.quote("Cache-Control: no-cache"))\n"
+        #if TUN_COMPAT
+        guard let boundInterface, TUNSupport.physicalInterface(boundInterface) else {
+            throw CampusError.message("TUN 兼容版尚未找到真实 Wi-Fi，未发送请求。")
+        }
+        configuration += "interface = \(Self.quote("if!" + boundInterface))\n"
+        if let resolvedAddress {
+            configuration += "resolve = \(Self.quote(try TUNSupport.resolveOption(url: url, address: resolvedAddress)))\n"
+        } else if TUNSupport.octets(url.host ?? "") == nil {
+            throw CampusError.message("TUN 兼容版未获得真实解析地址，未使用系统 Fake-IP 解析。")
+        }
+        #endif
         if headOnly { configuration += "head\n" }
         if let body {
             configuration += "header = \(Self.quote("Content-Type: application/x-www-form-urlencoded; charset=UTF-8"))\ndata = \(Self.quote(body))\n"
@@ -252,10 +274,14 @@ final class DirectHTTP {
         return try HTTPResponse.parse(received)
     }
     func isOnline() -> Bool {
+        #if TUN_COMPAT
+        return TUNSupport.isOnline(self)
+        #else
         if (try? request(Portal.secureProbe, timeout: 3).appleSuccess) == true { return true }
         // A single external endpoint can be temporarily unreachable even when
         // authentication is valid. The fallback still requires verified TLS.
         return (try? request(Portal.secondarySecureProbe, timeout: 2, headOnly: true).status) == 200
+        #endif
     }
 }
 
@@ -264,7 +290,11 @@ enum Portal {
     static let probe = URL(string: "http://captive.apple.com/hotspot-detect.html")!
     static let secureProbe = URL(string: "https://www.apple.com/library/test/success.html")!
     static let secondarySecureProbe = URL(string: "https://www.baidu.com/")!
+    #if TUN_COMPAT
+    static let discoveryEntries = TUNSupport.discoveryEntries
+    #else
     static let discoveryEntries = [URL(string: "http://1.1.1.1/")!, probe, URL(string: "http://www.baidu.com/")!]
+    #endif
     static let componentCharacters = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.!~*'()")
     static func encode(_ value: String) -> String { value.addingPercentEncoding(withAllowedCharacters: componentCharacters)! }
     static func doubleEncode(_ value: String) -> String { encode(encode(value)) }

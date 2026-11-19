@@ -21,9 +21,15 @@ jobs:
         run: swift build
       - name: Run offline checks
         run: zsh test.sh
+      - name: Run TUN offline checks
+        run: zsh test-tun.sh
       - name: Build app bundle
         run: zsh build.sh
+      - name: Build TUN app bundle
+        run: zsh build-tun.sh
       - name: Verify bundle metadata and signature
         run: |
           plutil -lint "build/校园网自动登录.app/Contents/Info.plist"
           codesign --verify --strict "build/校园网自动登录.app"
+          plutil -lint "build/tun/校园网自动登录.app/Contents/Info.plist"
+          codesign --verify --strict "build/tun/校园网自动登录.app"

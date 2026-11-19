@@ -18,6 +18,24 @@
       "options": { "cwd": "${workspaceFolder}" },
       "group": "test",
       "problemMatcher": []
+    },
+    {
+      "label": "校园网：构建 TUN 兼容版",
+      "type": "process",
+      "command": "/bin/zsh",
+      "args": ["${workspaceFolder}/build-tun.sh"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "校园网：TUN 离线检查",
+      "type": "process",
+      "command": "/bin/zsh",
+      "args": ["${workspaceFolder}/test-tun.sh"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": "test",
+      "problemMatcher": []
     }
   ]
 }

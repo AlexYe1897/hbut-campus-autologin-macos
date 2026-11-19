@@ -256,8 +256,13 @@ final class SettingsController: NSObject, NSWindowDelegate {
             field.frame = NSRect(x: 28, y: y, width: 544, height: height)
             content.addSubview(field)
         }
+        #if TUN_COMPAT
+        label("湖北工业大学 · 校园网自动登录（TUN）", 445, size: 20, height: 30)
+        label("TUN 兼容版：本工具经真实 Wi-Fi 直连，平时不定时联网。", 410)
+        #else
         label("湖北工业大学 · 校园网自动登录", 445, size: 20, height: 30)
         label("唤醒或 Wi-Fi 连接变化后检查，平时不定时联网。", 410)
+        #endif
         runningLabel.frame = NSRect(x: 28, y: 380, width: 544, height: 24)
         runningLabel.font = .systemFont(ofSize: 13, weight: .medium)
         lastCheckLabel.frame = NSRect(x: 28, y: 350, width: 544, height: 24)
@@ -406,10 +411,19 @@ final class SettingsController: NSObject, NSWindowDelegate {
         if arguments.contains("--diagnose") {
             let network = NetworkSnapshot.current()
             let http = DirectHTTP(Cancellation(), seconds: 5)
+            #if TUN_COMPAT
+            let online = http.isOnline()
+            #else
             let online = (try? http.request(Portal.secureProbe, timeout: 3).appleSuccess) == true
-            let report: [String: Any] = ["wifiReady": network != nil, "networkIdentifierAvailable": !(network?.profile.isEmpty ?? true),
+            #endif
+            var report: [String: Any] = ["wifiReady": network != nil, "networkIdentifierAvailable": !(network?.profile.isEmpty ?? true),
                                         "directInternetWorks": online, "configured": Configuration.load() != nil,
                                         "periodicChecks": false, "proxyChanges": false]
+            #if TUN_COMPAT
+            report["networkMode"] = "TUN compatibility"
+            report["boundToPhysicalWiFi"] = http.boundInterface != nil
+            report["registeredCampusWiFi"] = Configuration.load().map { network?.matches($0) == true } ?? false
+            #endif
             if let data = try? JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys]) {
                 print(String(decoding: data, as: UTF8.self))
             }
